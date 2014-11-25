@@ -30,6 +30,7 @@ module.exports = function(grunt) {
             '<%= dirs.src %>/InteractionData.js',
             '<%= dirs.src %>/InteractionManager.js',
             '<%= dirs.src %>/display/Stage.js',
+            '<%= dirs.src %>/time/Time.js',
             '<%= dirs.src %>/utils/Utils.js',
             '<%= dirs.src %>/utils/EventTarget.js',
             '<%= dirs.src %>/utils/Detector.js',

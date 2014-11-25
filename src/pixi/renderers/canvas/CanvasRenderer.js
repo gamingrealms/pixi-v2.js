@@ -118,6 +118,8 @@ PIXI.CanvasRenderer = function(width, height, options)
      */
     this.context = this.view.getContext( "2d", { alpha: this.transparent } );
 
+    this.time = new PIXI.Time(options.targetFrameRate, options.minFrameRate);
+
     /**
      * Boolean flag controlling canvas refresh.
      *
@@ -189,6 +191,8 @@ PIXI.CanvasRenderer.prototype.constructor = PIXI.CanvasRenderer;
  */
 PIXI.CanvasRenderer.prototype.render = function(stage)
 {
+    stage.time = this.time;
+
     stage.updateTransform();
 
     this.context.setTransform(1,0,0,1,0,0);
@@ -228,6 +232,8 @@ PIXI.CanvasRenderer.prototype.render = function(stage)
             stage.interactionManager.setTarget(this);
         }
     }
+
+    this.time.update();
 };
 
 /**

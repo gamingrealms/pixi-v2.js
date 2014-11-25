@@ -3,5 +3,6 @@ node_modules
 .project
 *.sublime-*
 *.log
-
 bin/pixi.dev.js.map
+.idea
+*.iml

@@ -57,6 +57,9 @@ PIXI.Stage = function(backgroundColor)
      */
     this.dirty = true;
 
+
+    this.time = null;
+
     //the stage is its own stage
     this.stage = this;
 

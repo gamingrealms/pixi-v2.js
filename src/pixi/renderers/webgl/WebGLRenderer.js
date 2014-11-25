@@ -122,6 +122,9 @@ PIXI.WebGLRenderer = function(width, height, options)
      */
     this.view = options.view || document.createElement( 'canvas' );
 
+
+    this.time = new PIXI.Time(options.targetFrameRate, options.minFrameRate);
+
     // deal with losing context..
 
     /**
@@ -284,6 +287,8 @@ PIXI.WebGLRenderer.prototype.render = function(stage)
     // no point rendering if our context has been blown up!
     if(this.contextLost)return;
 
+    stage.time = this.time;
+
     // if rendering a new stage clear the batches..
     if(this.__stage !== stage)
     {
@@ -339,6 +344,8 @@ PIXI.WebGLRenderer.prototype.render = function(stage)
     }
 
     this.renderDisplayObject( stage, this.projection );
+
+    this.time.update();
 };
 
 /**
