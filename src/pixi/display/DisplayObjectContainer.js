@@ -120,7 +120,13 @@ PIXI.DisplayObjectContainer.prototype.addChildAt = function(child, index)
 
         this.children.splice(index, 0, child);
 
-        if(this.stage)child.setStageReference(this.stage);
+        if(this.stage) {
+
+            child.setStageReference(this.stage);
+
+            // PH: Bejig
+            child.updateTransform();
+        }
 
         return child;
     }
