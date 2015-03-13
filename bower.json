@@ -1,7 +1,9 @@
 {
     "name": "pixi.js",
-    "version": "2.2.3-bejig",
+    "version": "2.2.7",
+
     "main": "bin/pixi.dev.js",
+
     "ignore": [
         "**/.*",
         "node_modules",
