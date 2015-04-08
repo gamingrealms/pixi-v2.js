@@ -1,10 +1,10 @@
 /**
  * @license
- * pixi.js - v2.2.8
+ * pixi.js - v2.2.8-bejig
  * Copyright (c) 2012-2014, Mat Groves
  * http://goodboydigital.com/
  *
- * Compiled: 2015-03-15
+ * Compiled: 2015-04-08
  *
  * pixi.js is licensed under the MIT License.
  * http://www.opensource.org/licenses/mit-license.php
@@ -1924,7 +1924,13 @@ PIXI.DisplayObjectContainer.prototype.addChildAt = function(child, index)
 
         this.children.splice(index, 0, child);
 
-        if(this.stage)child.setStageReference(this.stage);
+        if(this.stage) {
+
+            child.setStageReference(this.stage);
+
+            // PH: Bejig
+            child.updateTransform();
+        }
 
         return child;
     }
@@ -3118,7 +3124,7 @@ PIXI.MovieClip.prototype.updateTransform = function()
 
     if(!this.playing)return;
 
-    this.currentFrame += this.animationSpeed;
+    this.currentFrame += this.animationSpeed * this.stage.time.timeScale;
 
     var round = (this.currentFrame + 0.5) | 0;
 
@@ -5130,6 +5136,9 @@ PIXI.Stage = function(backgroundColor)
      */
     this.dirty = true;
 
+
+    this.time = null;
+
     //the stage is its own stage
     this.stage = this;
 
@@ -5207,6 +5216,67 @@ PIXI.Stage.prototype.getMousePosition = function()
     return this.interactionManager.mouse.global;
 };
 
+PIXI.Time = function (targetFrameRate, minFrameRate) {
+    if (targetFrameRate !== undefined) {
+        this.setTargetFrameRate(targetFrameRate);
+    }
+    if (minFrameRate !== undefined) {
+        this.setMinFrameRate(minFrameRate);
+    }
+};
+
+PIXI.Time.prototype = {
+    timeScale: 1,
+    _tFrameRate: 60,
+    _minFrameRate: 12,
+    _tMilli: 1000 / 60,
+    _minMilli: 1000 / 12,
+    _prevMilli: Date.now(),
+
+    setTargetFrameRate: function (framerate) {
+        this._tFrameRate = framerate;
+        this._tMilli = 1000 / framerate;
+    },
+
+    getTargetFrameRate: function () {
+        return this._tFrameRate;
+    },
+
+    setMinFrameRate: function (framerate) {
+        if (framerate > this._tFrameRate) {
+            throw 'Your target minimum framerate must be smaller than your target framerate: ' + this._tFrameRate;
+        } else {
+
+            this._minFrameRate = framerate;
+            this._minMilli = 1000 / framerate;
+        }
+    },
+
+    getMinFrameRate: function () {
+        return this._minFrameRate;
+    },
+
+    update: function () {
+        var curMilli = Date.now();
+        var milliDif = curMilli - this._prevMilli;
+        if (milliDif > this._minMilli) {
+            milliDif = this._minMilli;
+        }
+        this.timeScale = milliDif / this._tMilli;
+        this._prevMilli = curMilli;
+    }
+};
+
+Object.defineProperty(PIXI.Time.prototype, 'targetFrameRate', {
+    get: PIXI.Time.getTargetFrameRate,
+    set: PIXI.Time.setTargetFrameRate
+});
+
+Object.defineProperty(PIXI.Time.prototype, 'minFrameRate', {
+
+    get: PIXI.Time.getMinFrameRate,
+    set: PIXI.Time.setMinFrameRate
+});
 /**
  * @author Mat Groves http://matgroves.com/ @Doormat23
  */
@@ -7991,6 +8061,9 @@ PIXI.WebGLRenderer = function(width, height, options)
      */
     this.view = options.view || document.createElement( 'canvas' );
 
+
+    this.time = new PIXI.Time(options.targetFrameRate, options.minFrameRate);
+
     // deal with losing context..
 
     /**
@@ -8153,6 +8226,8 @@ PIXI.WebGLRenderer.prototype.render = function(stage)
     // no point rendering if our context has been blown up!
     if(this.contextLost)return;
 
+    stage.time = this.time;
+
     // if rendering a new stage clear the batches..
     if(this.__stage !== stage)
     {
@@ -8208,6 +8283,8 @@ PIXI.WebGLRenderer.prototype.render = function(stage)
     }
 
     this.renderDisplayObject( stage, this.projection );
+
+    this.time.update();
 };
 
 /**
@@ -11132,6 +11209,8 @@ PIXI.CanvasRenderer = function(width, height, options)
      */
     this.context = this.view.getContext( "2d", { alpha: this.transparent } );
 
+    this.time = new PIXI.Time(options.targetFrameRate, options.minFrameRate);
+
     /**
      * Boolean flag controlling canvas refresh.
      *
@@ -11203,6 +11282,8 @@ PIXI.CanvasRenderer.prototype.constructor = PIXI.CanvasRenderer;
  */
 PIXI.CanvasRenderer.prototype.render = function(stage)
 {
+    stage.time = this.time;
+
     stage.updateTransform();
 
     this.context.setTransform(1,0,0,1,0,0);
@@ -11242,6 +11323,8 @@ PIXI.CanvasRenderer.prototype.render = function(stage)
             stage.interactionManager.setTarget(this);
         }
     }
+
+    this.time.update();
 };
 
 /**
