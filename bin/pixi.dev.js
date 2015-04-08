@@ -1,10 +1,10 @@
 /**
  * @license
- * pixi.js - v2.2.7-bejig
+ * pixi.js - v2.2.8
  * Copyright (c) 2012-2014, Mat Groves
  * http://goodboydigital.com/
  *
- * Compiled: 2015-03-13
+ * Compiled: 2015-03-15
  *
  * pixi.js is licensed under the MIT License.
  * http://www.opensource.org/licenses/mit-license.php
@@ -55,7 +55,7 @@ PIXI.CANVAS_RENDERER = 1;
  * @property {String} VERSION
  * @static
  */
-PIXI.VERSION = "v2.2.7";
+PIXI.VERSION = "v2.2.8";
 
 /**
  * Various blend modes supported by pixi. IMPORTANT - The WebGL renderer only supports the NORMAL, ADD, MULTIPLY and SCREEN blend modes.
@@ -1924,13 +1924,7 @@ PIXI.DisplayObjectContainer.prototype.addChildAt = function(child, index)
 
         this.children.splice(index, 0, child);
 
-        if(this.stage) {
-
-            child.setStageReference(this.stage);
-
-            // PH: Bejig
-            child.updateTransform();
-        }
+        if(this.stage)child.setStageReference(this.stage);
 
         return child;
     }
@@ -3124,7 +3118,7 @@ PIXI.MovieClip.prototype.updateTransform = function()
 
     if(!this.playing)return;
 
-    this.currentFrame += this.animationSpeed * this.stage.time.timeScale;
+    this.currentFrame += this.animationSpeed;
 
     var round = (this.currentFrame + 0.5) | 0;
 
@@ -3240,6 +3234,7 @@ PIXI.FilterBlock.prototype.constructor = PIXI.FilterBlock;
  * @param [style.dropShadowColor='#000000'] {String} A fill style to be used on the dropshadow e.g 'red', '#00FF00'
  * @param [style.dropShadowAngle=Math.PI/4] {Number} Set a angle of the drop shadow
  * @param [style.dropShadowDistance=5] {Number} Set a distance of the drop shadow
+ * @param [style.lineJoin='miter'] {String} The lineJoin property sets the type of corner created, it can resolve spiked text issue. Default is 'miter' (creates a sharp corner).
  */
 PIXI.Text = function(text, style)
 {
@@ -3340,6 +3335,7 @@ Object.defineProperty(PIXI.Text.prototype, 'height', {
  * @param [style.dropShadowColor='#000000'] {String} A fill style to be used on the dropshadow e.g 'red', '#00FF00'
  * @param [style.dropShadowAngle=Math.PI/4] {Number} Set a angle of the drop shadow
  * @param [style.dropShadowDistance=5] {Number} Set a distance of the drop shadow
+ * @param [style.lineJoin='miter'] {String} The lineJoin property sets the type of corner created, it can resolve spiked text issue. Default is 'miter' (creates a sharp corner).
  */
 PIXI.Text.prototype.setStyle = function(style)
 {
@@ -3356,6 +3352,7 @@ PIXI.Text.prototype.setStyle = function(style)
     style.dropShadowAngle = style.dropShadowAngle || Math.PI / 6;
     style.dropShadowDistance = style.dropShadowDistance || 4;
     style.dropShadowColor = style.dropShadowColor || 'black';
+    style.lineJoin = style.lineJoin || 'miter';
 
     this.style = style;
     this.dirty = true;
@@ -3430,7 +3427,7 @@ PIXI.Text.prototype.updateText = function()
     this.context.strokeStyle = this.style.stroke;
     this.context.lineWidth = this.style.strokeThickness;
     this.context.textBaseline = 'alphabetic';
-    //this.context.lineJoin = 'round';
+    this.context.lineJoin = this.style.lineJoin;
 
     var linePositionX;
     var linePositionY;
@@ -4734,18 +4731,41 @@ PIXI.InteractionManager.prototype.onTouchMove = function(event)
     var rect = this.interactionDOMElement.getBoundingClientRect();
     var changedTouches = event.changedTouches;
     var touchData;
-    var i = 0;
 
-    for (i = 0; i < changedTouches.length; i++)
+    var cLength = changedTouches.length;
+    var wCalc = (this.target.width / rect.width);
+    var hCalc = (this.target.height / rect.height);
+    var isSupportCocoonJS = navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height;
+    var touchEvent;
+
+    for (var c = 0; c < cLength; c++)
     {
-        var touchEvent = changedTouches[i];
+        touchEvent = changedTouches[c];
+        if(!isSupportCocoonJS)
+        {
+            touchEvent.globalX = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchEvent.globalY = ( (touchEvent.clientY - rect.top)  * hCalc )  / this.resolution;
+        }
+        else
+        {
+            touchEvent.globalX = touchEvent.clientX;
+            touchEvent.globalY = touchEvent.clientY;
+        }
+    }
+
+    for (var i = 0; i < cLength; i++)
+    {
+        touchEvent = changedTouches[i];
         touchData = this.touches[touchEvent.identifier];
         touchData.originalEvent = event;
 
         // update the touch position
-        touchEvent.globalX = touchData.global.x = ( (touchEvent.clientX - rect.left) * (this.target.width / rect.width) ) / this.resolution;
-        touchEvent.globalY = touchData.global.y = ( (touchEvent.clientY - rect.top)  * (this.target.height / rect.height) )  / this.resolution;
-        if (navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height)
+        if (!isSupportCocoonJS)
+        {
+            touchEvent.globalX = touchData.global.x = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchEvent.globalY = touchData.global.y = ( (touchEvent.clientY - rect.top)  * hCalc ) / this.resolution;
+        }
+        else
         {
             //Support for CocoonJS fullscreen scale modes
             touchData.global.x = touchEvent.clientX;
@@ -4785,9 +4805,31 @@ PIXI.InteractionManager.prototype.onTouchStart = function(event)
     }
 
     var changedTouches = event.changedTouches;
-    for (var i=0; i < changedTouches.length; i++)
+
+    var cLength = changedTouches.length;
+    var wCalc = (this.target.width / rect.width);
+    var hCalc = (this.target.height / rect.height);
+    var isSupportCocoonJS = navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height;
+    var touchEvent;
+
+    for (var c = 0; c < cLength; c++)
     {
-        var touchEvent = changedTouches[i];
+        touchEvent = changedTouches[c];
+        if(!isSupportCocoonJS)
+        {
+            touchEvent.globalX = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchEvent.globalY = ( (touchEvent.clientY - rect.top)  * hCalc )  / this.resolution;
+        }
+        else
+        {
+            touchEvent.globalX = touchEvent.clientX;
+            touchEvent.globalY = touchEvent.clientY;
+        }
+    }
+
+    for (var i=0; i < cLength; i++)
+    {
+        touchEvent = changedTouches[i];
 
         var touchData = this.pool.pop();
         if (!touchData)
@@ -4798,9 +4840,12 @@ PIXI.InteractionManager.prototype.onTouchStart = function(event)
         touchData.originalEvent = event;
 
         this.touches[touchEvent.identifier] = touchData;
-        touchData.global.x = ( (touchEvent.clientX - rect.left) * (this.target.width / rect.width) ) / this.resolution;
-        touchData.global.y = ( (touchEvent.clientY - rect.top)  * (this.target.height / rect.height) ) / this.resolution;
-        if (navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height)
+        if (!isSupportCocoonJS)
+        {
+            touchData.global.x = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchData.global.y = ( (touchEvent.clientY - rect.top)  * hCalc ) / this.resolution;
+        }
+        else
         {
             //Support for CocoonJS fullscreen scale modes
             touchData.global.x = touchEvent.clientX;
@@ -4849,14 +4894,38 @@ PIXI.InteractionManager.prototype.onTouchEnd = function(event)
     var rect = this.interactionDOMElement.getBoundingClientRect();
     var changedTouches = event.changedTouches;
 
-    for (var i=0; i < changedTouches.length; i++)
+    var cLength = changedTouches.length;
+    var wCalc = (this.target.width / rect.width);
+    var hCalc = (this.target.height / rect.height);
+    var isSupportCocoonJS = navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height;
+    var touchEvent;
+
+    for (var c = 0; c < cLength; c++)
     {
-        var touchEvent = changedTouches[i];
+        touchEvent = changedTouches[c];
+        if(!isSupportCocoonJS)
+        {
+            touchEvent.globalX = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchEvent.globalY = ( (touchEvent.clientY - rect.top)  * hCalc )  / this.resolution;
+        }
+        else
+        {
+            touchEvent.globalX = touchEvent.clientX;
+            touchEvent.globalY = touchEvent.clientY;
+        }
+    }
+
+    for (var i=0; i < cLength; i++)
+    {
+        touchEvent = changedTouches[i];
         var touchData = this.touches[touchEvent.identifier];
         var up = false;
-        touchData.global.x = ( (touchEvent.clientX - rect.left) * (this.target.width / rect.width) ) / this.resolution;
-        touchData.global.y = ( (touchEvent.clientY - rect.top)  * (this.target.height / rect.height) ) / this.resolution;
-        if (navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height)
+        if (!isSupportCocoonJS)
+        {
+            touchData.global.x = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchData.global.y = ( (touchEvent.clientY - rect.top)  * hCalc ) / this.resolution;
+        }
+        else
         {
             //Support for CocoonJS fullscreen scale modes
             touchData.global.x = touchEvent.clientX;
@@ -4931,14 +5000,38 @@ PIXI.InteractionManager.prototype.onTouchCancel = function(event)
     var rect = this.interactionDOMElement.getBoundingClientRect();
     var changedTouches = event.changedTouches;
 
-    for (var i=0; i < changedTouches.length; i++)
+    var cLength = changedTouches.length;
+    var wCalc = (this.target.width / rect.width);
+    var hCalc = (this.target.height / rect.height);
+    var isSupportCocoonJS = navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height;
+    var touchEvent;
+
+    for (var c = 0; c < cLength; c++)
     {
-        var touchEvent = changedTouches[i];
+        touchEvent = changedTouches[c];
+        if(!isSupportCocoonJS)
+        {
+            touchEvent.globalX = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchEvent.globalY = ( (touchEvent.clientY - rect.top)  * hCalc )  / this.resolution;
+        }
+        else
+        {
+            touchEvent.globalX = touchEvent.clientX;
+            touchEvent.globalY = touchEvent.clientY;
+        }
+    }
+
+    for (var i=0; i < cLength; i++)
+    {
+        touchEvent = changedTouches[i];
         var touchData = this.touches[touchEvent.identifier];
         var up = false;
-        touchData.global.x = ( (touchEvent.clientX - rect.left) * (this.target.width / rect.width) ) / this.resolution;
-        touchData.global.y = ( (touchEvent.clientY - rect.top)  * (this.target.height / rect.height) ) / this.resolution;
-        if (navigator.isCocoonJS && !rect.left && !rect.top && !event.target.style.width && !event.target.style.height)
+        if (!isSupportCocoonJS)
+        {
+            touchData.global.x = ( (touchEvent.clientX - rect.left) * wCalc ) / this.resolution;
+            touchData.global.y = ( (touchEvent.clientY - rect.top)  * hCalc ) / this.resolution;
+        }
+        else
         {
             //Support for CocoonJS fullscreen scale modes
             touchData.global.x = touchEvent.clientX;
@@ -5037,9 +5130,6 @@ PIXI.Stage = function(backgroundColor)
      */
     this.dirty = true;
 
-
-    this.time = null;
-
     //the stage is its own stage
     this.stage = this;
 
@@ -5117,67 +5207,6 @@ PIXI.Stage.prototype.getMousePosition = function()
     return this.interactionManager.mouse.global;
 };
 
-PIXI.Time = function (targetFrameRate, minFrameRate) {
-    if (targetFrameRate !== undefined) {
-        this.setTargetFrameRate(targetFrameRate);
-    }
-    if (minFrameRate !== undefined) {
-        this.setMinFrameRate(minFrameRate);
-    }
-};
-
-PIXI.Time.prototype = {
-    timeScale: 1,
-    _tFrameRate: 60,
-    _minFrameRate: 12,
-    _tMilli: 1000 / 60,
-    _minMilli: 1000 / 12,
-    _prevMilli: Date.now(),
-
-    setTargetFrameRate: function (framerate) {
-        this._tFrameRate = framerate;
-        this._tMilli = 1000 / framerate;
-    },
-
-    getTargetFrameRate: function () {
-        return this._tFrameRate;
-    },
-
-    setMinFrameRate: function (framerate) {
-        if (framerate > this._tFrameRate) {
-            throw 'Your target minimum framerate must be smaller than your target framerate: ' + this._tFrameRate;
-        } else {
-
-            this._minFrameRate = framerate;
-            this._minMilli = 1000 / framerate;
-        }
-    },
-
-    getMinFrameRate: function () {
-        return this._minFrameRate;
-    },
-
-    update: function () {
-        var curMilli = Date.now();
-        var milliDif = curMilli - this._prevMilli;
-        if (milliDif > this._minMilli) {
-            milliDif = this._minMilli;
-        }
-        this.timeScale = milliDif / this._tMilli;
-        this._prevMilli = curMilli;
-    }
-};
-
-Object.defineProperty(PIXI.Time.prototype, 'targetFrameRate', {
-    get: PIXI.Time.getTargetFrameRate,
-    set: PIXI.Time.setTargetFrameRate
-});
-
-Object.defineProperty(PIXI.Time.prototype, 'minFrameRate', {
-
-    get: PIXI.Time.getMinFrameRate,
-    set: PIXI.Time.setMinFrameRate
-});
 /**
  * @author Mat Groves http://matgroves.com/ @Doormat23
  */
@@ -7962,9 +7991,6 @@ PIXI.WebGLRenderer = function(width, height, options)
      */
     this.view = options.view || document.createElement( 'canvas' );
 
-
-    this.time = new PIXI.Time(options.targetFrameRate, options.minFrameRate);
-
     // deal with losing context..
 
     /**
@@ -8127,8 +8153,6 @@ PIXI.WebGLRenderer.prototype.render = function(stage)
     // no point rendering if our context has been blown up!
     if(this.contextLost)return;
 
-    stage.time = this.time;
-
     // if rendering a new stage clear the batches..
     if(this.__stage !== stage)
     {
@@ -8184,8 +8208,6 @@ PIXI.WebGLRenderer.prototype.render = function(stage)
     }
 
     this.renderDisplayObject( stage, this.projection );
-
-    this.time.update();
 };
 
 /**
@@ -11110,8 +11132,6 @@ PIXI.CanvasRenderer = function(width, height, options)
      */
     this.context = this.view.getContext( "2d", { alpha: this.transparent } );
 
-    this.time = new PIXI.Time(options.targetFrameRate, options.minFrameRate);
-
     /**
      * Boolean flag controlling canvas refresh.
      *
@@ -11183,8 +11203,6 @@ PIXI.CanvasRenderer.prototype.constructor = PIXI.CanvasRenderer;
  */
 PIXI.CanvasRenderer.prototype.render = function(stage)
 {
-    stage.time = this.time;
-
     stage.updateTransform();
 
     this.context.setTransform(1,0,0,1,0,0);
@@ -11224,8 +11242,6 @@ PIXI.CanvasRenderer.prototype.render = function(stage)
             stage.interactionManager.setTarget(this);
         }
     }
-
-    this.time.update();
 };
 
 /**
@@ -13969,8 +13985,10 @@ PIXI.TilingSprite.prototype.destroy = function () {
     this.tileScaleOffset = null;
     this.tilePosition = null;
 
-    this.tilingTexture.destroy(true);
-    this.tilingTexture = null;
+    if (this.tilingTexture) {
+        this.tilingTexture.destroy(true);
+        this.tilingTexture = null;
+    }
 };
 
 /******************************************************************************
@@ -14718,12 +14736,9 @@ spine.DrawOrderTimeline.prototype = {
 		var drawOrder = skeleton.drawOrder;
 		var slots = skeleton.slots;
 		var drawOrderToSetupIndex = this.drawOrders[frameIndex];
-		if (!drawOrderToSetupIndex) {
-			for (var i = 0, n = slots.length; i < n; i++)
-				drawOrder[i] = slots[i];
-		} else {
+		if (drawOrderToSetupIndex) {
 			for (var i = 0, n = drawOrderToSetupIndex.length; i < n; i++)
-				drawOrder[i] = skeleton.slots[drawOrderToSetupIndex[i]];
+				drawOrder[i] = drawOrderToSetupIndex[i];
 		}
 
 	}
@@ -14981,7 +14996,7 @@ spine.Skeleton = function (skeletonData) {
 		var bone = this.bones[skeletonData.bones.indexOf(slotData.boneData)];
 		var slot = new spine.Slot(slotData, bone);
 		this.slots.push(slot);
-		this.drawOrder.push(slot);
+		this.drawOrder.push(i);
 	}
 
 	this.ikConstraints = [];
@@ -15073,11 +15088,10 @@ spine.Skeleton.prototype = {
 	},
 	setSlotsToSetupPose: function () {
 		var slots = this.slots;
-		var drawOrder = this.drawOrder;
 		for (var i = 0, n = slots.length; i < n; i++) {
-			drawOrder[i] = slots[i];
 			slots[i].setToSetupPose(i);
 		}
+		this.resetDrawOrder();
 	},
 	/** @return May return null. */
 	getRootBone: function () {
@@ -15177,6 +15191,10 @@ spine.Skeleton.prototype = {
 	},
 	update: function (delta) {
 		this.time += delta;
+	},
+	resetDrawOrder: function() {
+		for (var i = 0, n = this.drawOrder.length; i < n; i++)
+			this.drawOrder[i] = i;
 	}
 };
 
@@ -15514,6 +15532,7 @@ spine.AnimationState.prototype = {
 		}
 	},
 	apply: function (skeleton) {
+		skeleton.resetDrawOrder();
 		for (var i = 0; i < this.tracks.length; i++) {
 			var current = this.tracks[i];
 			if (!current) continue;
@@ -16688,8 +16707,8 @@ PIXI.Spine = function (url) {
 
     this.slotContainers = [];
 
-    for (var i = 0, n = this.skeleton.drawOrder.length; i < n; i++) {
-        var slot = this.skeleton.drawOrder[i];
+    for (var i = 0, n = this.skeleton.slots.length; i < n; i++) {
+        var slot = this.skeleton.slots[i];
         var attachment = slot.attachment;
         var slotContainer = new PIXI.DisplayObjectContainer();
         this.slotContainers.push(slotContainer);
@@ -16759,8 +16778,11 @@ PIXI.Spine.prototype.update = function(dt)
     this.skeleton.updateWorldTransform();
 
     var drawOrder = this.skeleton.drawOrder;
-    for (var i = 0, n = drawOrder.length; i < n; i++) {
-        var slot = drawOrder[i];
+    var slots = this.skeleton.slots;
+    for (var i = 0, n = drawOrder.length; i < n; i++)
+        this.children[i] = this.slotContainers[drawOrder[i]];
+    for (i = 0, n = slots.length; i < n; i++) {
+        var slot = slots[i];
         var attachment = slot.attachment;
         var slotContainer = this.slotContainers[i];
 
@@ -18354,7 +18376,10 @@ PIXI.JsonLoader.prototype.onJSONLoaded = function () {
     if(this.json.frames && this.json.meta && this.json.meta.image)
     {
         // sprite sheet
-        var textureUrl = this.baseUrl + this.json.meta.image;
+        var textureUrl = this.json.meta.image;
+        if (textureUrl.indexOf('data:') === -1) {
+            textureUrl = this.baseUrl + textureUrl;
+        }
         var image = new PIXI.ImageLoader(textureUrl, this.crossorigin);
         var frameData = this.json.frames;
 
