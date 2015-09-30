@@ -69,7 +69,7 @@ PIXI.ImageLoader.prototype.onLoaded = function()
     this.emit('loaded', { content: this });
 };
 
-PIXI.ImageLoader.prototype.onLoaded = function()
+PIXI.ImageLoader.prototype.onError = function()
 {
     this.emit('error', { content: this });
 };
