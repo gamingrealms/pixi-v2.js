@@ -49,6 +49,8 @@ PIXI.ImageLoader.prototype.load = function()
     if(!this.texture.baseTexture.hasLoaded)
     {
         this.texture.baseTexture.on('loaded', this.onLoaded.bind(this));
+
+        this.texture.baseTexture.on('error', this.onError.bind(this));
     }
     else
     {
@@ -65,6 +67,11 @@ PIXI.ImageLoader.prototype.load = function()
 PIXI.ImageLoader.prototype.onLoaded = function()
 {
     this.emit('loaded', { content: this });
+};
+
+PIXI.ImageLoader.prototype.onLoaded = function()
+{
+    this.emit('error', { content: this });
 };
 
 /**
